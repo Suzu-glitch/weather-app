@@ -1,0 +1,50 @@
+@use "loading";
+@use "weather";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+}
+
+#app {
+  min-height: 100vh;
+  padding: 1rem;
+  color: #fff;
+  background: linear-gradient(0deg, #404547, #252e3a 51%);
+}
+
+#app.app--with-background {
+  background-image:
+    linear-gradient(0deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
+    var(--detail-condition-image);
+  background-size: cover;
+  background-position: center;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+}
+
+@media screen and (min-width: 700px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #394759;
+  }
+
+  #app {
+    width: 400px;
+    height: 900px;
+    min-height: unset;
+    overflow: auto;
+    border-radius: 6px;
+    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.3);
+  }
+}
