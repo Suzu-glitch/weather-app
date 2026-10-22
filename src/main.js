@@ -1,8 +1,13 @@
 import "./styles/main.scss";
-import { fetchForecast } from "./api.js";
+import { fetchForecast, searchCities } from "./api.js";
 import { getConditionImagePath } from "./conditions.js";
+import {
+  addFavoriteCityId,
+  getFavoriteCityIds,
+  removeFavoriteCityId,
+} from "./storage.js";
+import { debounce } from "./utils.js";
 
-const CITY_QUERY = "Mannheim";
 const WEEKDAY_NAMES = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 const appEl = document.getElementById("app");
@@ -23,6 +28,15 @@ function renderLoading(message) {
     <div class="loading">
       <div class="loading__message">${message}</div>
       <div class="loading__spinner"></div>
+    </div>
+  `;
+}
+
+function renderActionBar(isFavorite) {
+  return `
+    <div class="action-bar">
+      <button class="action-bar__back">Zurück</button>
+      ${isFavorite ? "" : `<button class="action-bar__favorite">Favorit hinzufügen</button>`}
     </div>
   `;
 }
@@ -152,15 +166,33 @@ function renderMiniStats(current, today) {
   return `<div class="mini-stats">${statsHtml}</div>`;
 }
 
-function renderDetails(weatherData) {
+function setupDetailsEvents(cityId) {
+  const backButtonEl = document.querySelector(".action-bar__back");
+  const favoriteButtonEl = document.querySelector(".action-bar__favorite");
+
+  backButtonEl.addEventListener("click", () => {
+    renderMainMenu();
+  });
+
+  if (favoriteButtonEl) {
+    favoriteButtonEl.addEventListener("click", () => {
+      addFavoriteCityId(cityId);
+      favoriteButtonEl.remove();
+    });
+  }
+}
+
+function renderDetails(weatherData, cityId) {
   const { location, current, forecast } = weatherData;
   const today = forecast.forecastday[0];
+  const isFavorite = getFavoriteCityIds().includes(cityId);
 
   applyBackground(
     getConditionImagePath(current.condition.code, current.is_day !== 1),
   );
 
   appEl.innerHTML =
+    renderActionBar(isFavorite) +
     renderCurrentWeather(location, current, today) +
     renderTodayForecast(
       today,
@@ -169,16 +201,213 @@ function renderDetails(weatherData) {
     ) +
     renderThreeDayForecast(forecast.forecastday) +
     renderMiniStats(current, today);
+
+  setupDetailsEvents(cityId);
 }
 
-async function init() {
-  renderLoading("Lade Wetter für " + CITY_QUERY + "...");
+async function showCityDetails(cityId, cityName) {
+  renderLoading("Lade Wetter für " + cityName + "...");
+
   try {
-    const weatherData = await fetchForecast(CITY_QUERY, 3);
-    renderDetails(weatherData);
+    const weatherData = await fetchForecast("id:" + cityId, 3);
+    renderDetails(weatherData, cityId);
   } catch (error) {
     appEl.innerHTML = `<p>${error.message}</p>`;
   }
 }
 
-init();
+function renderMainMenuHeader() {
+  return `
+    <div class="main-menu__heading">
+      Wetter
+      <button class="main-menu__edit-button">Bearbeiten</button>
+    </div>
+    <div class="main-menu__search-bar">
+      <input type="text" class="main-menu__search-input" placeholder="Nach Stadt suchen..." />
+      <div class="main-menu__search-results main-menu__search-results--hidden"></div>
+    </div>
+  `;
+}
+
+function renderCityCard(cityId, weatherData) {
+  const { location, current, forecast } = weatherData;
+  const today = forecast.forecastday[0];
+  const imageUrl = getConditionImagePath(
+    current.condition.code,
+    current.is_day !== 1,
+  );
+  const styleAttribute = imageUrl
+    ? `style="--city-image: url(${imageUrl})"`
+    : "";
+
+  return `
+    <div class="city-wrapper">
+      <button class="city-wrapper__delete" data-city-id="${cityId}" aria-label="Stadt entfernen">-</button>
+      <div class="city" data-city-id="${cityId}" data-city-name="${location.name}" ${styleAttribute}>
+        <div class="city__left-column">
+          <div>
+            <h2 class="city__name">${location.name}</h2>
+            <div class="city__country">${location.country}</div>
+          </div>
+          <div>${current.condition.text}</div>
+        </div>
+        <div class="city__right-column">
+          <div class="city__temperature">${Math.round(current.temp_c)}°</div>
+          <div>H:${Math.round(today.day.maxtemp_c)}° T:${Math.round(today.day.mintemp_c)}°</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function renderCityCards() {
+  const favoriteCityIds = getFavoriteCityIds();
+
+  if (favoriteCityIds.length === 0) {
+    return `<div class="main-menu__cities"><p>Noch keine Favoriten gespeichert.</p></div>`;
+  }
+
+  let cardsHtml = "";
+
+  for (const cityId of favoriteCityIds) {
+    const weatherData = await fetchForecast("id:" + cityId, 1);
+    cardsHtml += renderCityCard(cityId, weatherData);
+  }
+
+  return `<div class="main-menu__cities">${cardsHtml}</div>`;
+}
+
+function setupCityEvents() {
+  // Klick auf eine Karte öffnet die Detailansicht
+  document.querySelectorAll(".city").forEach((cityEl) => {
+    cityEl.addEventListener("click", () => {
+      showCityDetails(
+        cityEl.getAttribute("data-city-id"),
+        cityEl.getAttribute("data-city-name"),
+      );
+    });
+  });
+
+  document
+    .querySelectorAll(".city-wrapper__delete")
+    .forEach((deleteButtonEl) => {
+      deleteButtonEl.addEventListener("click", () => {
+        removeFavoriteCityId(deleteButtonEl.getAttribute("data-city-id"));
+        deleteButtonEl.parentElement.remove();
+
+        if (getFavoriteCityIds().length === 0) {
+          document.querySelector(".main-menu__cities").innerHTML =
+            "<p>Noch keine Favoriten gespeichert.</p>";
+        }
+      });
+    });
+}
+
+function setupEditButton() {
+  const mainMenuEl = document.querySelector(".main-menu");
+  const editButtonEl = document.querySelector(".main-menu__edit-button");
+
+  // Schaltet den Bearbeiten-Modus an und aus (die Lösch-Buttons erscheinen per CSS)
+  editButtonEl.addEventListener("click", () => {
+    const isEditMode = mainMenuEl.classList.toggle("main-menu--edit-mode");
+    editButtonEl.textContent = isEditMode ? "Fertig" : "Bearbeiten";
+  });
+}
+
+function showSearchResults() {
+  const searchResultsEl = document.querySelector(".main-menu__search-results");
+  searchResultsEl.classList.remove("main-menu__search-results--hidden");
+}
+
+function hideSearchResults() {
+  const searchResultsEl = document.querySelector(".main-menu__search-results");
+  searchResultsEl.classList.add("main-menu__search-results--hidden");
+}
+
+function renderSearchResults(cities) {
+  const searchResultsEl = document.querySelector(".main-menu__search-results");
+
+  if (cities.length === 0) {
+    searchResultsEl.innerHTML = `<div class="search-result">Keine Städte gefunden.</div>`;
+    return;
+  }
+
+  searchResultsEl.innerHTML = cities
+    .map((city) => {
+      return `
+        <div class="search-result" data-city-id="${city.id}" data-city-name="${city.name}" tabindex="0">
+          <h3 class="search-result__name">${city.name}</h3>
+          <p>${city.region ? city.region + ", " : ""}${city.country}</p>
+        </div>
+      `;
+    })
+    .join("");
+
+  document
+    .querySelectorAll(".search-result[data-city-id]")
+    .forEach((resultEl) => {
+      resultEl.addEventListener("click", () => {
+        showCityDetails(
+          resultEl.getAttribute("data-city-id"),
+          resultEl.getAttribute("data-city-name"),
+        );
+      });
+    });
+}
+
+async function handleSearchInput(event) {
+  const searchText = event.target.value.trim();
+  const searchResultsEl = document.querySelector(".main-menu__search-results");
+
+  if (searchText.length < 2) {
+    searchResultsEl.innerHTML = "";
+    return;
+  }
+
+  searchResultsEl.innerHTML = `<div class="search-result">Lade Vorschläge...</div>`;
+  showSearchResults();
+
+  try {
+    const cities = await searchCities(searchText);
+    renderSearchResults(cities);
+  } catch (error) {
+    searchResultsEl.innerHTML = `<div class="search-result">${error.message}</div>`;
+  }
+}
+
+function setupSearch() {
+  const searchInputEl = document.querySelector(".main-menu__search-input");
+
+  searchInputEl.addEventListener("input", debounce(handleSearchInput, 500));
+
+  searchInputEl.addEventListener("focus", showSearchResults);
+}
+
+document.addEventListener("click", (event) => {
+  const searchBarEl = document.querySelector(".main-menu__search-bar");
+
+  if (searchBarEl && !searchBarEl.contains(event.target)) {
+    hideSearchResults();
+  }
+});
+
+async function renderMainMenu() {
+  renderLoading("Lade Übersicht...");
+
+  try {
+    appEl.innerHTML = `
+      <div class="main-menu">
+        ${renderMainMenuHeader()}
+        ${await renderCityCards()}
+      </div>
+    `;
+
+    setupEditButton();
+    setupSearch();
+    setupCityEvents();
+  } catch (error) {
+    appEl.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+renderMainMenu();
