@@ -12,6 +12,24 @@ const WEEKDAY_NAMES = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 const appEl = document.getElementById("app");
 
+const BACK_ICON = `
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+  </svg>
+`;
+
+const FAVORITE_ICON = `
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+  </svg>
+`;
+
+const DELETE_ICON = `
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+`;
+
 function applyBackground(imageUrl) {
   if (!imageUrl) {
     appEl.classList.remove("app--with-background");
@@ -35,8 +53,12 @@ function renderLoading(message) {
 function renderActionBar(isFavorite) {
   return `
     <div class="action-bar">
-      <button class="action-bar__back">Zurück</button>
-      ${isFavorite ? "" : `<button class="action-bar__favorite">Favorit hinzufügen</button>`}
+      <button class="action-bar__back" aria-label="Zurück">${BACK_ICON}</button>
+      ${
+        isFavorite
+          ? ""
+          : `<button class="action-bar__favorite" aria-label="Zu Favoriten hinzufügen">${FAVORITE_ICON}</button>`
+      }
     </div>
   `;
 }
@@ -66,7 +88,7 @@ function renderTodayForecast(today, forecastDays, nowEpoch) {
   const hoursHtml = getNext24Hours(forecastDays, nowEpoch)
     .map((hour, index) => {
       const timeLabel =
-        index === 0 ? "Jetzt" : hour.time.slice(11, 16) + " Uhr";
+        index === 0 ? "Jetzt" : hour.time.slice(11, 13) + " Uhr";
       return `
         <div class="hourly-forecast">
           <div>${timeLabel}</div>
@@ -104,7 +126,7 @@ function renderThreeDayForecast(forecastDays) {
           <img class="forecast-day__icon" src="https:${forecastDay.day.condition.icon}" alt="${forecastDay.day.condition.text}" />
           <div>H:${Math.round(forecastDay.day.maxtemp_c)}°</div>
           <div>T:${Math.round(forecastDay.day.mintemp_c)}°</div>
-          <div class="forecast-day__wind">Wind: ${forecastDay.day.maxwind_kph} km/h</div>
+          <div>Wind: ${forecastDay.day.maxwind_kph} km/h</div>
         </div>
       `;
     })
@@ -136,7 +158,7 @@ function formatTime(timeString) {
 function renderMiniStats(current, today) {
   const stats = [
     { heading: "Feuchtigkeit", value: current.humidity + "%" },
-    { heading: "Gefühlt", value: Math.round(current.feelslike_c) + "°" },
+    { heading: "Gefühlt", value: current.feelslike_c + "°" },
     {
       heading: "Sonnenaufgang",
       value: formatTime(today.astro.sunrise) + " Uhr",
@@ -145,11 +167,8 @@ function renderMiniStats(current, today) {
       heading: "Sonnenuntergang",
       value: formatTime(today.astro.sunset) + " Uhr",
     },
-    { heading: "Niederschlag", value: current.precip_mm + " mm" },
+    { heading: "Niederschlag", value: current.precip_mm + "mm" },
     { heading: "UV-Index", value: current.uv },
-    { heading: "Wind", value: current.wind_kph + " km/h" },
-    { heading: "Sichtweite", value: current.vis_km + " km" },
-    { heading: "Luftdruck", value: current.pressure_mb + " hPa" },
   ];
 
   const statsHtml = stats
@@ -242,7 +261,7 @@ function renderCityCard(cityId, weatherData) {
 
   return `
     <div class="city-wrapper">
-      <button class="city-wrapper__delete" data-city-id="${cityId}" aria-label="Stadt entfernen">-</button>
+      <button class="city-wrapper__delete" data-city-id="${cityId}" aria-label="Stadt entfernen">${DELETE_ICON}</button>
       <div class="city" data-city-id="${cityId}" data-city-name="${location.name}" ${styleAttribute}>
         <div class="city__left-column">
           <div>
@@ -278,7 +297,6 @@ async function renderCityCards() {
 }
 
 function setupCityEvents() {
-  // Klick auf eine Karte öffnet die Detailansicht
   document.querySelectorAll(".city").forEach((cityEl) => {
     cityEl.addEventListener("click", () => {
       showCityDetails(
@@ -307,7 +325,6 @@ function setupEditButton() {
   const mainMenuEl = document.querySelector(".main-menu");
   const editButtonEl = document.querySelector(".main-menu__edit-button");
 
-  // Schaltet den Bearbeiten-Modus an und aus (die Lösch-Buttons erscheinen per CSS)
   editButtonEl.addEventListener("click", () => {
     const isEditMode = mainMenuEl.classList.toggle("main-menu--edit-mode");
     editButtonEl.textContent = isEditMode ? "Fertig" : "Bearbeiten";
@@ -379,7 +396,6 @@ function setupSearch() {
   const searchInputEl = document.querySelector(".main-menu__search-input");
 
   searchInputEl.addEventListener("input", debounce(handleSearchInput, 500));
-
   searchInputEl.addEventListener("focus", showSearchResults);
 }
 

@@ -20,6 +20,7 @@
     color: #fff;
     font-size: 1rem;
     font-weight: 700;
+    text-shadow: 1px 1px 5px #000;
     cursor: pointer;
   }
 
@@ -59,7 +60,7 @@
   }
 
   &--edit-mode .city-wrapper__delete {
-    display: flex;
+    display: block;
   }
 }
 
@@ -90,17 +91,18 @@
   &__delete {
     display: none;
     flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
     width: 2rem;
-    height: 2rem;
+    padding: 0;
     border: none;
-    border-radius: 50%;
-    background-color: #f13c3c;
-    color: #fff;
-    font-size: 1.5rem;
-    line-height: 1;
+    background-color: transparent;
+    color: #f13c3c;
+    filter: drop-shadow(1px 1px 5px #000);
     cursor: pointer;
+
+    svg {
+      display: block;
+      width: 100%;
+    }
   }
 }
 
@@ -108,6 +110,7 @@
   flex-grow: 1;
   display: flex;
   justify-content: space-between;
+  gap: 1rem;
   min-height: 7rem;
   padding: 1rem;
   border-radius: 6px;
@@ -128,8 +131,14 @@
     justify-content: space-between;
   }
 
+  &__left-column {
+    min-width: 0;
+  }
+
   &__right-column {
+    flex-shrink: 0;
     align-items: flex-end;
+    white-space: nowrap;
   }
 
   &__name {

@@ -9,7 +9,12 @@
 }
 
 body {
-  font-family: Arial, sans-serif;
+  font-family: Inter, sans-serif;
+}
+
+button,
+input {
+  font-family: inherit;
 }
 
 #app {
@@ -29,6 +34,7 @@ body {
 
 ::-webkit-scrollbar {
   width: 0;
+  height: 0;
 }
 
 @media screen and (min-width: 700px) {
