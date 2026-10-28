@@ -1,6 +1,6 @@
 import { fetchForecast } from "../api.js";
 import { getConditionImagePath } from "../conditions.js";
-import { appEl, renderLoading } from "../dom.js";
+import { appEl, renderError, renderLoading } from "../dom.js";
 import { DELETE_ICON } from "../icons.js";
 import { getFavoriteCityIds, removeFavoriteCityId } from "../storage.js";
 import { setupSearch } from "./search.js";
@@ -56,12 +56,13 @@ async function renderCityCards() {
     return `<div class="main-menu__cities"><p>Noch keine Favoriten gespeichert.</p></div>`;
   }
 
-  let cardsHtml = "";
+  const weatherDataList = await Promise.all(
+    favoriteCityIds.map((cityId) => fetchForecast("id:" + cityId, 1)),
+  );
 
-  for (const cityId of favoriteCityIds) {
-    const weatherData = await fetchForecast("id:" + cityId, 1);
-    cardsHtml += renderCityCard(cityId, weatherData);
-  }
+  const cardsHtml = favoriteCityIds
+    .map((cityId, index) => renderCityCard(cityId, weatherDataList[index]))
+    .join("");
 
   return `<div class="main-menu__cities">${cardsHtml}</div>`;
 }
@@ -116,6 +117,11 @@ export async function renderMainMenu(onCitySelect) {
     setupSearch(onCitySelect);
     setupCityEvents(onCitySelect);
   } catch (error) {
-    appEl.innerHTML = `<p>${error.message}</p>`;
+    renderError(error.message, [
+      {
+        label: "Erneut versuchen",
+        handler: () => renderMainMenu(onCitySelect),
+      },
+    ]);
   }
 }

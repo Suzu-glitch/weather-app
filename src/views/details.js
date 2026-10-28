@@ -1,6 +1,6 @@
 import { fetchForecast } from "../api.js";
 import { getConditionImagePath } from "../conditions.js";
-import { appEl, applyBackground, renderLoading } from "../dom.js";
+import { appEl, applyBackground, renderError, renderLoading } from "../dom.js";
 import { BACK_ICON, FAVORITE_ICON } from "../icons.js";
 import { addFavoriteCityId, getFavoriteCityIds } from "../storage.js";
 
@@ -48,7 +48,7 @@ function renderTodayForecast(today, forecastDays, nowEpoch) {
       return `
         <div class="hourly-forecast">
           <div>${timeLabel}</div>
-          <img class="hourly-forecast__icon" src="https:${hour.condition.icon}" alt="${hour.condition.text}" />
+          <img class="hourly-forecast__icon" src="https:${hour.condition.icon}" alt="${hour.condition.text}" draggable="false" />
           <div>${Math.round(hour.temp_c)}°</div>
         </div>
       `;
@@ -82,7 +82,7 @@ function renderThreeDayForecast(forecastDays) {
           <img class="forecast-day__icon" src="https:${forecastDay.day.condition.icon}" alt="${forecastDay.day.condition.text}" />
           <div>H:${Math.round(forecastDay.day.maxtemp_c)}°</div>
           <div>T:${Math.round(forecastDay.day.mintemp_c)}°</div>
-          <div>Wind: ${forecastDay.day.maxwind_kph} km/h</div>
+          <div class="forecast-day__wind">Wind: ${forecastDay.day.maxwind_kph} km/h</div>
         </div>
       `;
     })
@@ -141,6 +141,58 @@ function renderMiniStats(current, today) {
   return `<div class="mini-stats">${statsHtml}</div>`;
 }
 
+function setupHourlyScroll() {
+  const hoursEl = document.querySelector(".today-forecast__hours");
+  let isDragging = false;
+  let startX = 0;
+  let startScrollLeft = 0;
+
+  function stopDragging() {
+    isDragging = false;
+    hoursEl.classList.remove("today-forecast__hours--dragging");
+  }
+
+  hoursEl.addEventListener("mousedown", (event) => {
+    isDragging = true;
+    startX = event.pageX;
+    startScrollLeft = hoursEl.scrollLeft;
+    hoursEl.classList.add("today-forecast__hours--dragging");
+  });
+
+  hoursEl.addEventListener("mousemove", (event) => {
+    if (!isDragging) {
+      return;
+    }
+    event.preventDefault();
+    hoursEl.scrollLeft = startScrollLeft - (event.pageX - startX);
+  });
+
+  hoursEl.addEventListener("mouseup", stopDragging);
+  hoursEl.addEventListener("mouseleave", stopDragging);
+
+  hoursEl.addEventListener(
+    "wheel",
+    (event) => {
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) {
+        return;
+      }
+
+      const isAtStart = hoursEl.scrollLeft <= 0 && event.deltaY < 0;
+      const isAtEnd =
+        hoursEl.scrollLeft + hoursEl.clientWidth >= hoursEl.scrollWidth - 1 &&
+        event.deltaY > 0;
+
+      if (isAtStart || isAtEnd) {
+        return;
+      }
+
+      event.preventDefault();
+      hoursEl.scrollLeft += event.deltaY;
+    },
+    { passive: false },
+  );
+}
+
 function setupDetailsEvents(cityId, onBack) {
   const backButtonEl = document.querySelector(".action-bar__back");
   const favoriteButtonEl = document.querySelector(".action-bar__favorite");
@@ -153,6 +205,8 @@ function setupDetailsEvents(cityId, onBack) {
       favoriteButtonEl.remove();
     });
   }
+
+  setupHourlyScroll();
 }
 
 function renderDetails(weatherData, cityId, onBack) {
@@ -185,6 +239,12 @@ export async function showCityDetails(cityId, cityName, onBack) {
     const weatherData = await fetchForecast("id:" + cityId, 3);
     renderDetails(weatherData, cityId, onBack);
   } catch (error) {
-    appEl.innerHTML = `<p>${error.message}</p>`;
+    renderError(error.message, [
+      {
+        label: "Erneut versuchen",
+        handler: () => showCityDetails(cityId, cityName, onBack),
+      },
+      { label: "Zurück", handler: onBack },
+    ]);
   }
 }

@@ -51,7 +51,12 @@ async function handleSearchInput(event, onCitySelect) {
     return;
   }
 
-  searchResultsEl.innerHTML = `<div class="search-result">Lade Vorschläge...</div>`;
+  searchResultsEl.innerHTML = `
+    <div class="search-result search-result--loading">
+      <div class="loading__spinner loading__spinner--small"></div>
+      <span>Lade Vorschläge...</span>
+    </div>
+  `;
   showSearchResults();
 
   try {

@@ -17,6 +17,12 @@
     border-color: #fff transparent transparent transparent;
     border-radius: 50%;
     animation: spin 1s linear infinite;
+
+    &--small {
+      width: 24px;
+      height: 24px;
+      border-width: 3px;
+    }
   }
 }
 
